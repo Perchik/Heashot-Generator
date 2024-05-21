@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "@svgr/webpack": "^8.1.0",
-    "react-color": "^2.19.3"
-  }
-}
