@@ -1,0 +1,37 @@
+.color-picker-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  height: 100vh;
+  gap: 20px;
+}
+
+.controls-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.svg-container {
+  justify-content: center;
+  align-items: center;
+}
+
+.color-picker,
+.part-picker {
+  margin-bottom: 20px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.part-picker select,
+.part-picker input {
+  margin: 10px 0;
+  padding: 5px;
+  font-size: 16px;
+}
