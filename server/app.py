@@ -78,4 +78,3 @@ if __name__ == '__main__':
             file.write(svg_headshot)
 
         print("SVG headshot generated and saved to 'headshot.svg'")
-   
