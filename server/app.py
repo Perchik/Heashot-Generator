@@ -1,56 +1,13 @@
-from flask import Flask, request, jsonify, make_response
+import os
 import random
 import pickle
 import xml.etree.ElementTree as ET
 import json
-import os
+from preprocess import preprocess_svgs  # Import the preprocess function
 
-app = Flask(__name__)
-
-# Preprocess SVG files to create a cache if it doesn't exist
-
-
-def preprocess_svgs(body_svgs_dir='body_svgs', hair_svgs_dir='hair_svgs'):
-    svg_cache = {}
-
-    # Process body SVGs
-    for i in range(1, 13):
-        body_file = f'{body_svgs_dir}/Body{i}.svg'
-        tree = ET.parse(body_file)
-        root = tree.getroot()
-
-        body_elements = {'tree': tree, 'skin': None, 'accessory': None}
-
-        for elem in root.iter():
-            if 'id' in elem.attrib:
-                if elem.attrib['id'] == 'skin':
-                    body_elements['skin'] = elem
-                elif elem.attrib['id'] == 'accessory':
-                    body_elements['accessory'] = elem
-
-        svg_cache[f'Body{i}'] = body_elements
-
-    # Process hair SVGs
-    for i in range(1, 17):
-        hair_file = f'{hair_svgs_dir}/Hair{i}.svg'
-        tree = ET.parse(hair_file)
-        root = tree.getroot()
-
-        hair_elements = {'tree': tree, 'hair': None, 'accessory': None}
-
-        for elem in root.iter():
-            if 'id' in elem.attrib:
-                if elem.attrib['id'] == 'hair':
-                    hair_elements['hair'] = elem
-                elif elem.attrib['id'] == 'accessory':
-                    hair_elements['accessory'] = elem
-
-        svg_cache[f'Hair{i}'] = hair_elements
-
-    # Save the cache to a file
-    with open('svg_cache.pkl', 'wb') as cache_file:
-        pickle.dump(svg_cache, cache_file)
-
+# Set the working directory to the script's directory
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
 
 # Check if cache exists, if not run preprocessing
 if not os.path.exists('svg_cache.pkl'):
@@ -70,8 +27,10 @@ def generate_svg_headshot(accessory_color):
     skin_color, hair_color = random.choice(skin_hair_combinations)
 
     # Randomly choose body and hair SVG identifiers
-    body_id = f'Body{random.randint(1, 12)}'
-    hair_id = f'Hair{random.randint(1, 16)}'
+    body_id = random.choice(
+        [key for key in svg_cache.keys() if key.startswith('Body')])
+    hair_id = random.choice(
+        [key for key in svg_cache.keys() if key.startswith('Hair')])
 
     # Get the SVG elements from the cache
     body_elements = svg_cache[body_id]
@@ -80,8 +39,10 @@ def generate_svg_headshot(accessory_color):
     # Update skin and accessory colors in the body SVG
     if body_elements['skin'] is not None:
         body_elements['skin'].attrib['fill'] = skin_color
-    if body_elements['accessory'] is not None:
-        body_elements['accessory'].attrib['fill'] = accessory_color
+
+       # Update accessory colors in the body SVG
+    for accessory in body_elements['accessories']:
+        accessory.attrib['fill'] = accessory_color
 
     # Update hair and accessory colors in the hair SVG
     if hair_elements['hair'] is not None:
@@ -104,16 +65,17 @@ def generate_svg_headshot(accessory_color):
     return combined_svg_str
 
 
-@app.route('/generate_svg_headshot', methods=['POST'])
-def generate_svg_headshot_route():
-    data = request.get_json()
-    # Default to black if not provided
-    accessory_color = data.get('accessory_color', '#000000')
-    svg_headshot = generate_svg_headshot(accessory_color)
-    response = make_response(svg_headshot)
-    response.headers['Content-Type'] = 'image/svg+xml'
-    return response
-
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # This section is for generating a single SVG without starting the server
+    generate_single_svg = True
+
+    if generate_single_svg:
+        accessory_color = '#4ec764'  # Example accessory color
+        svg_headshot = generate_svg_headshot(accessory_color)
+
+        # Save the SVG headshot to a file
+        with open('headshot.svg', 'w', encoding='utf-8') as file:
+            file.write(svg_headshot)
+
+        print("SVG headshot generated and saved to 'headshot.svg'")
+   
