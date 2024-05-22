@@ -24,7 +24,7 @@ with open('skin_hair_combinations.json', 'r') as json_file:
 
 def generate_svg_headshot(accessory_color):
     # Randomly choose skin and hair color
-    skin_color, hair_color = random.choice(skin_hair_combinations)
+    skin_color, hair_color, _ = random.choice(skin_hair_combinations)
 
     # Randomly choose body and hair SVG identifiers
     body_id = random.choice(
