@@ -11,10 +11,11 @@ const ColorPicker: React.FC = () => {
   const [shirtColor, setShirtColor] = useState<string>("#FFFFFF");
   const [accessory, setAccessory] = useState<string>("Tie");
   const [recentColors, setRecentColors] = useState<string[]>([]);
+  const [counter, setCounter] = useState<number>(1);
 
   useEffect(() => {
-    const tieElement = document.getElementById("Tie");
-    const bowtieElement = document.getElementById("Bowtie");
+    const tieElement = document.getElementById("TieGroup");
+    const bowtieElement = document.getElementById("BowtieGroup");
     if (tieElement)
       tieElement.style.display = accessory === "Tie" ? "inline" : "none";
     if (bowtieElement)
@@ -51,10 +52,12 @@ const ColorPicker: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "modified_body.svg";
+    a.download = `Body${counter}.svg`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    setCounter(counter + 1); // Increment counter after saving
   };
 
   const handleSetColor = () => {
@@ -104,6 +107,13 @@ const ColorPicker: React.FC = () => {
     }
   };
 
+  const handleCounterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newCounter = parseInt(event.target.value, 10);
+    if (!isNaN(newCounter)) {
+      setCounter(newCounter);
+    }
+  };
+
   return (
     <div className="color-picker-container">
       <div className="svg-container">
@@ -130,6 +140,10 @@ const ColorPicker: React.FC = () => {
           />
         </div>
         <button onClick={handleSetColor}>Set Color</button>
+        <div className="counter-container">
+          <h3>Set Counter</h3>
+          <input type="number" value={counter} onChange={handleCounterChange} />
+        </div>
         <div className="accessory-picker">
           <h3>Select Accessory</h3>
           <label>
