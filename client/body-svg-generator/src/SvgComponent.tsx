@@ -4,7 +4,7 @@ import { SVGProps } from "react";
 const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
   <svg
     // width="44mm"
-    // height="72mm"a
+    // height="72mm"
     height="500px"
     width="500px"
     viewBox="0 0 44 72"
