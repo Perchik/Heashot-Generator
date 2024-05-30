@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generated SVG Grid</title>
+    <style>
+        .svg-grid {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .svg-item {
+            margin: 10px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generated SVG Grid</h1>
+    <div class="svg-grid">
+        <!-- SVG items will be inserted here -->
+        <script>
+            const svgDir = 'generated_svgs';
+            const svgCount = /* Insert the number of generated SVG files here */;
+            const svgGrid = document.querySelector('.svg-grid');
+
+            for (let i = 0; i < svgCount; i++) {
+                const svgItem = document.createElement('div');
+                svgItem.classList.add('svg-item');
+                svgItem.innerHTML = `<object type="image/svg+xml" data="${svgDir}/svg_${i}.svg"></object>`;
+                svgGrid.appendChild(svgItem);
+            }
+        </script>
+    </div>
+</body>
+</html>
