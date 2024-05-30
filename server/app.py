@@ -1,170 +1,142 @@
 import os
 import random
-import pickle
 import json
 import logging
 import argparse
+import gc
+from copy import deepcopy
 from lxml import etree as ET
-from preprocess import preprocess_svgs
 
 HEX_CODES = [
-    "#f94144",
-    "#f3722c",
-    "#f9c74f",
-    "#90be6d",
-    "#43aa8b",
-    "#277da1",
-    "#5d4f92",
-    "#ff91af",
-    "#c0c0c0",
-    "#111111"
+    "#f94144", "#f3722c", "#f9c74f", "#90be6d", "#43aa8b",
+    "#277da1", "#5d4f92", "#ff91af", "#c0c0c0", "#111111"
 ]
 
 # Set up logging
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.DEBUG)
-logger.addHandler(stream_handler)
 
-logger.debug("Starting script execution...")
 
-# Set the working directory to the script's directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-os.chdir(script_dir)
+def setup_directory():
+    """Set the working directory to the script's directory."""
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Check if cache exists, if not run preprocessing
-if not os.path.exists('svg_cache.pkl'):
-    logger.info("svg_cache.pkl not found. Running preprocessing...")
-    preprocess_svgs()
 
-# Load the SVG cache
-logger.info("Loading SVG cache...")
-with open('svg_cache.pkl', 'rb') as cache_file:
-    svg_cache = pickle.load(cache_file)
+def load_svgs(directory):
+    """Load and categorize SVGs from a directory."""
+    svg_files = {}
+    for filename in os.listdir(directory):
+        if filename.endswith(".svg"):
+            file_path = os.path.join(directory, filename)
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+            body_elements = {'tree': tree, 'skin': None, 'accessories': []}
+            for elem in root.iter():
+                if 'id' in elem.attrib:
+                    if elem.attrib['id'] == 'Head':
+                        body_elements['skin'] = elem
+                    elif elem.attrib['id'] in ['Tie', 'TieKnot', 'Bowtie']:
+                        body_elements['accessories'].append(elem)
+                    elif elem.attrib['id'] == 'hair':
+                        body_elements['hair'] = elem
+                    elif elem.attrib['id'] == 'accessory':
+                        body_elements['accessory'] = elem
+            svg_files[filename] = body_elements
+    return svg_files
 
-# Convert string representations back to ElementTree objects
-logger.info("Converting string representations back to ElementTree objects...")
-for key, value in svg_cache.items():
+
+def load_skin_hair_combinations():
+    """Load skin and hair color combinations from JSON file."""
+    with open('skin_hair_combinations.json', 'r') as json_file:
+        return json.load(json_file)
+
+
+def generate_svg_headshot(skin_color, hair_color, description, body_elements, hair_elements, accessory_color='#4ec764'):
+    """Generate a combined SVG headshot."""
     try:
-        tree = ET.ElementTree(ET.fromstring(value['tree']))
-        value['tree'] = tree
-        if value.get('skin') is not None:
-            value['skin'] = tree.find(f".//*[@id='{value['skin']}']")
-        value['accessories'] = [
-            tree.find(f".//*[@id='{acc}']") for acc in value.get('accessories', [])]
-        if value.get('hair') is not None:
-            value['hair'] = tree.find(f".//*[@id='{value['hair']}']")
-        if value.get('accessory') is not None:
-            value['accessory'] = tree.find(f".//*[@id='{value['accessory']}']")
-    except Exception as e:
-        logger.error(
-            "Error converting string to ElementTree for key %s: %s", key, e)
 
-# Load skin and hair color combinations from JSON file
-logger.info("Loading skin and hair color combinations from JSON file...")
-with open('skin_hair_combinations.json', 'r') as json_file:
-    skin_hair_combinations = json.load(json_file)
+        if not body_elements or not hair_elements:
+            raise ValueError("Missing body or hair elements")
 
-
-def generate_svg_headshot(skin_color, hair_color, description, body_id, hair_id, accessory_color='#4ec764'):
-    try:
-        # Get the SVG elements from the cache
-        body_elements = svg_cache[body_id]
-        hair_elements = svg_cache[hair_id]
-
-        # Update skin and accessory colors in the body SVG
-        if body_elements.get('skin') is not None:
+        # Update colors
+        if body_elements['skin'] is not None:
             body_elements['skin'].attrib['fill'] = skin_color
         else:
-            logger.warning("Skin element not found in body elements")
+            raise ValueError("Skin element not found in body elements")
 
-        # Update accessory colors in the body SVG
-        for accessory in body_elements.get('accessories', []):
+        for accessory in body_elements['accessories']:
             accessory.attrib['fill'] = accessory_color
 
-        # Update hair and accessory colors in the hair SVG
-        if hair_elements.get('hair') is not None:
+        if hair_elements['hair'] is not None:
             hair_elements['hair'].attrib['fill'] = hair_color
         else:
-            logger.warning("Hair element not found in hair elements")
+            raise ValueError("Hair element not found in hair elements")
 
-        if hair_elements.get('accessory') is not None:
+        if 'accessory' in hair_elements:
             hair_elements['accessory'].attrib['fill'] = accessory_color
 
-        # Create a combined SVG root element with proper namespace
+        # Create combined SVG
         combined_svg = ET.Element(
             'svg', nsmap={None: "http://www.w3.org/2000/svg"})
+        for attr, value in body_elements['tree'].getroot().attrib.items():
+            combined_svg.set(attr, value)
 
         description = description.replace('skin', f'skin ({skin_color})').replace(
             'hair', f'hair ({hair_color})')
-        generation_comment = ET.Comment(f'{body_id} x {hair_id}, {description} with {
-                                        accessory_color} accessory')
-        combined_svg.insert(0, generation_comment)
+        combined_svg.insert(0, ET.Comment(
+            f'{description} with {accessory_color} accessory'))
 
-        # Append body and hair elements to the combined SVG
-        for child in body_elements['tree'].getroot():
+        for child in list(body_elements['tree'].getroot()):
             combined_svg.append(child)
 
-        for child in hair_elements['tree'].getroot():
+        for child in list(hair_elements['tree'].getroot()):
             combined_svg.append(child)
 
-        # Convert combined SVG to string
-        combined_svg_str = ET.tostring(
-            combined_svg, pretty_print=True, encoding='unicode')
-
-        return combined_svg_str
+        return ET.tostring(combined_svg, pretty_print=True, encoding='unicode')
 
     except Exception as e:
         logger.error("Error generating SVG headshot: %s", e)
         return None
 
 
-def save_svgs():
-    logger.info("Saving all possible SVG combinations...")
+def save_svgs(body_svgs, hair_svgs, skin_hair_combinations):
+    """Generate and save all possible SVG combinations."""
     output_dir = 'generated_svgs'
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
 
-    body_ids = [key for key in svg_cache.keys() if key.startswith('Body')]
-    hair_ids = [key for key in svg_cache.keys() if key.startswith('Hair')]
-
-    body_iter = iter(body_ids)
-    hair_iter = iter(hair_ids)
+    body_ids = list(body_svgs.keys())
+    hair_ids = list(hair_svgs.keys())
 
     count = 0
     for skin_color, hair_color, description in skin_hair_combinations:
-        try:
-            body_id = next(body_iter)
-        except StopIteration:
-            body_iter = iter(body_ids)
-            body_id = next(body_iter)
+        body_id = body_ids[count % len(body_ids)]
+        hair_id = hair_ids[count % len(hair_ids)]
 
-        try:
-            hair_id = next(hair_iter)
-        except StopIteration:
-            hair_iter = iter(hair_ids)
-            hair_id = next(hair_iter)
+        logger.info(f"Generating SVG {count + 1} for body_id: {body_id}, hair_id: {
+                    hair_id}, skin_color: {skin_color}, hair_color: {hair_color}")
 
         svg_headshot = generate_svg_headshot(
-            skin_color, hair_color, description, body_id, hair_id)
+            skin_color, hair_color, description, body_svgs[body_id], hair_svgs[hair_id])
         if svg_headshot:
             file_name = f'svg_{count}.svg'
             with open(os.path.join(output_dir, file_name), 'w', encoding='utf-8') as file:
                 file.write(svg_headshot)
             count += 1
+            gc.collect()
+        else:
+            logger.warning(f"Failed to generate SVG for body_id: {
+                           body_id}, hair_id: {hair_id}")
+
     logger.info(f"Generated {count} SVG files")
 
 
-def generate_random_svg(accessory_color):
-    logger.info("Generating a random SVG headshot...")
+def generate_random_svg(body_svgs, hair_svgs, skin_hair_combinations, accessory_color):
+    """Generate a single random SVG headshot."""
     skin_color, hair_color, description = random.choice(skin_hair_combinations)
-    body_id = random.choice(
-        [key for key in svg_cache.keys() if key.startswith('Body')])
-    hair_id = random.choice(
-        [key for key in svg_cache.keys() if key.startswith('Hair')])
-    return generate_svg_headshot(skin_color, hair_color, description, body_id, hair_id, accessory_color)
+    body_id = random.choice(list(body_svgs.keys()))
+    hair_id = random.choice(list(hair_svgs.keys()))
+    return generate_svg_headshot(skin_color, hair_color, description, body_svgs[body_id], hair_svgs[hair_id], accessory_color)
 
 
 if __name__ == '__main__':
@@ -176,13 +148,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    logger.debug("Parsed arguments: %s", args)
+    setup_directory()
+    body_svgs = load_svgs('body_svgs')
+    hair_svgs = load_svgs('hair_svgs')
+    skin_hair_combinations = load_skin_hair_combinations()
 
     if args.all:
-        save_svgs()
+        save_svgs(body_svgs, hair_svgs, skin_hair_combinations)
     elif args.random:
-        logger.info("Random flag detected, generating random SVG...")
-        svg_headshot = generate_random_svg(random.choice(HEX_CODES))
+        svg_headshot = generate_random_svg(
+            body_svgs, hair_svgs, skin_hair_combinations, random.choice(HEX_CODES))
         if svg_headshot:
             with open('random_headshot.svg', 'w', encoding='utf-8') as file:
                 file.write(svg_headshot)

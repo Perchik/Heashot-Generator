@@ -16,7 +16,6 @@
   ["#f0d5c9", "#e8e8e8", "Fair skin, white hair"],
   ["#f0d5c9", "#b55239", "Fair skin, Irish red hair"],
 
-  ["#d1a684", "#e1a692", "Medium skin, light brown hair"],
   ["#d1a684", "#9b5c31", "Medium skin, medium brown hair"],
   ["#d1a684", "#5d3a1a", "Medium skin, dark brown hair"],
   ["#d1a684", "#d3b385", "Medium skin, blonde hair"],
@@ -54,21 +53,5 @@
   ["#4e342e", "#d3b385", "Dark brown skin, blonde hair"],
   ["#4e342e", "#b55239", "Dark brown skin, red hair"],
   ["#4e342e", "#d3d3d3", "Dark brown skin, grey hair"],
-  ["#4e342e", "#e8e8e8", "Dark brown skin, white hair"],
-
-  ["#3b302e", "#a67b4e", "Deep brown skin, light brown hair"],
-  ["#3b302e", "#8b5a2b", "Deep brown skin, medium brown hair"],
-  ["#3b302e", "#4b2e14", "Deep brown skin, dark brown hair"],
-  ["#3b302e", "#e0c08d", "Deep brown skin, blonde hair"],
-  ["#3b302e", "#c0442e", "Deep brown skin, red hair"],
-  ["#3b302e", "#b0b0b0", "Deep brown skin, grey hair"],
-  ["#3b302e", "#f5f5f5", "Deep brown skin, white hair"],
-
-  ["#292526", "#a67b4e", "Very dark skin, light brown hair"],
-  ["#292526", "#8b5a2b", "Very dark skin, medium brown hair"],
-  ["#292526", "#4b2e14", "Very dark skin, dark brown hair"],
-  ["#292526", "#e0c08d", "Very dark skin, blonde hair"],
-  ["#292526", "#c0442e", "Very dark skin, red hair"],
-  ["#292526", "#b0b0b0", "Very dark skin, grey hair"],
-  ["#292526", "#f5f5f5", "Very dark skin, white hair"]
+  ["#4e342e", "#e8e8e8", "Dark brown skin, white hair"]
 ]
