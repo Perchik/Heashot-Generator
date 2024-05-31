@@ -138,6 +138,10 @@ def generate_svg(body_svg, hair_svg, description, colors: ColorConfig):
         apply_body_colors(body_svg, colors)
         apply_hair_colors(hair_svg, colors)
 
+        ET.register_namespace('svg', "http://www.w3.org/2000/svg")
+        ET.register_namespace(
+            'sodipodi', "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd")
+
         # Create a new combined SVG element
         combined_svg = ET.Element('svg', xmlns="http://www.w3.org/2000/svg")
 
@@ -184,16 +188,29 @@ def generate_random_svg(body_svgs, hair_svgs, skin_hair_combinations, accessory_
     return generate_svg(body_svgs[body_id], hair_svgs[hair_id], description, ColorConfig(skin_color, hair_color, accessory_color))
 
 
-if __name__ == '__main__':
-    setup_directory()
+def generate_headshot(accessory_color):
+    """
+    Generate a single random SVG headshot with a given accessory color.
+
+    Parameters:
+    accessory_color (str): The color to apply to the accessory elements.
+
+    Returns:
+    str: The combined SVG as a string, or None if an error occurs.
+    """
     body_svgs = load_svgs(BODY_SVG_DIR, 'Body')
     hair_svgs = load_svgs(HAIR_SVG_DIR, 'Hair')
 
     with open(SKIN_HAIR_COMBINATIONS_FILE, 'r', encoding="utf-8") as json_file:
         skin_hair_combinations = json.load(json_file)
 
-    svg_headshot = generate_random_svg(
-        body_svgs, hair_svgs, skin_hair_combinations, random.choice(HEX_CODES))
+    return generate_random_svg(body_svgs, hair_svgs, skin_hair_combinations, accessory_color)
+
+
+if __name__ == '__main__':
+    setup_directory()
+    accessory_color = random.choice(HEX_CODES)
+    svg_headshot = generate_headshot(accessory_color)
     if svg_headshot:
         with open(OUTPUT_FILE, 'w', encoding='utf-8') as file:
             file.write(svg_headshot)
