@@ -2,9 +2,8 @@ import os
 import random
 import json
 import logging
-import argparse
-from copy import deepcopy
-from lxml import etree as ET
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
 # Configuration
 HEX_CODES = [
@@ -14,6 +13,15 @@ HEX_CODES = [
 BODY_SVG_DIR = 'body_svgs'
 HAIR_SVG_DIR = 'hair_svgs'
 SKIN_HAIR_COMBINATIONS_FILE = 'skin_hair_combinations.json'
+OUTPUT_FILE = 'random_headshot.svg'
+
+
+@dataclass
+class ColorConfig:
+    skin_color: str
+    hair_color: str
+    accessory_color: str
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO,
@@ -44,158 +52,114 @@ def load_svgs(svg_dir, prefix):
     for filename in os.listdir(svg_dir):
         if filename.startswith(prefix) and filename.endswith('.svg'):
             filepath = os.path.join(svg_dir, filename)
-            with open(filepath, 'r', encoding='utf-8') as file:
-                svg_files[filename] = ET.parse(file)
+            tree = ET.parse(filepath)
+            svg_files[filename] = tree
     return svg_files
 
 
-def load_skin_hair_combinations(filepath):
-    """
-    Load skin and hair color combinations from a JSON file.
-
-    Parameters:
-    filepath (str): The path to the JSON file.
-
-    Returns:
-    list: A list of skin and hair color combinations with descriptions.
-    """
-    with open(filepath, 'r') as json_file:
-        return json.load(json_file)
-
-
-def apply_body_colors(tree, skin_color, accessory_color):
+def apply_body_colors(tree, colors: ColorConfig):
     """
     Apply colors to the body SVG elements.
 
     Parameters:
     tree (ElementTree): The SVG tree to apply colors to.
-    skin_color (str): The color to apply to the skin elements.
-    accessory_color (str): The color to apply to the accessory elements.
+    colors (ColorConfig): The color configuration.
 
     Raises:
     ValueError: If required elements (skin) are not found.
     """
+    ns = {'svg': "http://www.w3.org/2000/svg"}  # Define the namespace
     root = tree.getroot()
-    skin = root.find(".//*[@id='Head']")
-    accessories = root.findall(
-        ".//*[@id='Tie'] | .//*[@id='TieKnot'] | .//*[@id='Bowtie']")
+    skin = root.find(".//*[@id='Head']", ns)
+
+    paths = root.findall(".//svg:path", ns)
+    accessories = [elem for elem in paths if elem.get(
+        'id') in {'Tie', 'TieKnot', 'Bowtie'}]
 
     if skin is not None:
-        skin.attrib['fill'] = skin_color
+        skin.attrib['fill'] = colors.skin_color
     else:
         raise ValueError("Skin element not found")
 
-    for accessory in accessories:
-        accessory.attrib['fill'] = accessory_color
+    if not accessories:
+        logger.debug("No accessories found")
+    else:
+        for accessory in accessories:
+            logger.debug("Setting accessory %s fill to %s",
+                         accessory.attrib.get('id'), colors.accessory_color)
+            accessory.attrib['fill'] = colors.accessory_color
 
 
-def apply_hair_colors(tree, hair_color, accessory_color):
+def apply_hair_colors(tree, colors: ColorConfig):
     """
     Apply colors to the hair SVG elements.
 
     Parameters:
     tree (ElementTree): The SVG tree to apply colors to.
-    hair_color (str): The color to apply to the hair elements.
-    accessory_color (str): The color to apply to the accessory elements.
+    colors (ColorConfig): The color configuration.
 
     Raises:
     ValueError: If required elements (hair) are not found.
     """
+    ns = {'svg': "http://www.w3.org/2000/svg"}  # Define the namespace
     root = tree.getroot()
-    hair = root.find(".//*[@id='hair']")
-    accessories = root.findall(".//*[@id='accessory']")
+    hair = root.find(".//*[@id='hair']", ns)
+    accessories = root.findall(".//*[@id='accessory']", ns)
 
     if hair is not None:
-        hair.attrib['fill'] = hair_color
+        hair.attrib['fill'] = colors.hair_color
     else:
         raise ValueError("Hair element not found")
 
-    for accessory in accessories:
-        accessory.attrib['fill'] = accessory_color
+    if not accessories or len(accessories) == 0:
+        logger.debug("No accessories found in hair")
+    else:
+        for accessory in accessories:
+            logger.debug("Setting accessory %s fill to %s",
+                         accessory.attrib.get('id'), colors.accessory_color)
+            accessory.attrib['fill'] = colors.accessory_color
 
 
-def generate_svg(body_svg, hair_svg, skin_color, hair_color, description, accessory_color='#4ec764'):
+def generate_svg(body_svg, hair_svg, description, colors: ColorConfig):
     """
     Generate a combined SVG headshot.
 
     Parameters:
     body_svg (ElementTree): The SVG tree for the body.
     hair_svg (ElementTree): The SVG tree for the hair.
-    skin_color (str): The color to apply to the skin elements.
-    hair_color (str): The color to apply to the hair elements.
     description (str): Description of the combination.
-    accessory_color (str, optional): The color to apply to the accessory elements. Defaults to '#4ec764'.
+    colors (ColorConfig): The color configuration.
 
     Returns:
     str: The combined SVG as a string, or None if an error occurs.
     """
     try:
-        # Deep copy the SVG trees to avoid modifying the originals
-        body_svg_copy = deepcopy(body_svg)
-        hair_svg_copy = deepcopy(hair_svg)
-
         # Apply colors to the SVG elements
-        apply_body_colors(body_svg_copy, skin_color, accessory_color)
-        apply_hair_colors(hair_svg_copy, hair_color, accessory_color)
+        apply_body_colors(body_svg, colors)
+        apply_hair_colors(hair_svg, colors)
 
         # Create a new combined SVG element
-        combined_svg = ET.Element(
-            'svg', nsmap={None: "http://www.w3.org/2000/svg"})
+        combined_svg = ET.Element('svg', xmlns="http://www.w3.org/2000/svg")
 
         # Copy attributes from the body SVG to the combined SVG
-        for attr, value in body_svg_copy.getroot().attrib.items():
+        for attr, value in body_svg.getroot().attrib.items():
             combined_svg.set(attr, value)
 
         # Add a comment with the description and accessory color
-        combined_svg.insert(0, ET.Comment(
-            f'{description} with {accessory_color} accessory'))
+        combined_svg.insert(0, ET.Comment(f'{description}'))
 
         # Append body and hair elements to the combined SVG
-        for child in body_svg_copy.getroot():
+        for child in body_svg.getroot():
             combined_svg.append(child)
-        for child in hair_svg_copy.getroot():
+        for child in hair_svg.getroot():
             combined_svg.append(child)
 
         # Return the combined SVG as a string
-        return ET.tostring(combined_svg, pretty_print=True, encoding='unicode')
+        return ET.tostring(combined_svg, encoding='unicode')
 
     except Exception as e:
         logger.error("Error generating SVG headshot: %s", e)
         return None
-
-
-def save_svgs(body_svgs, hair_svgs, skin_hair_combinations):
-    """
-    Generate and save all possible SVG combinations.
-
-    Parameters:
-    body_svgs (dict): A dictionary of body SVG trees.
-    hair_svgs (dict): A dictionary of hair SVG trees.
-    skin_hair_combinations (list): A list of skin and hair color combinations with descriptions.
-    """
-    output_dir = 'generated_svgs'
-    os.makedirs(output_dir, exist_ok=True)
-
-    body_ids = list(body_svgs.keys())
-    hair_ids = list(hair_svgs.keys())
-
-    count = 0
-    for skin_color, hair_color, description in skin_hair_combinations:
-        body_id = body_ids[count % len(body_ids)]
-        hair_id = hair_ids[count % len(hair_ids)]
-
-        svg_headshot = generate_svg(
-            body_svgs[body_id], hair_svgs[hair_id], skin_color, hair_color, description)
-        if svg_headshot:
-            file_name = f'svg_{count}.svg'
-            with open(os.path.join(output_dir, file_name), 'w', encoding='utf-8') as file:
-                file.write(svg_headshot)
-            count += 1
-        else:
-            logger.warning(f"Failed to generate SVG for body_id: {
-                           body_id}, hair_id: {hair_id}")
-
-    logger.info(f"Generated {count} SVG files")
 
 
 def generate_random_svg(body_svgs, hair_svgs, skin_hair_combinations, accessory_color):
@@ -205,44 +169,35 @@ def generate_random_svg(body_svgs, hair_svgs, skin_hair_combinations, accessory_
     Parameters:
     body_svgs (dict): A dictionary of body SVG trees.
     hair_svgs (dict): A dictionary of hair SVG trees.
-    skin_hair_combinations (list): A list of skin and hair color combinations with descriptions.
+    skin_hair_combinations (list): A list of lists, each containing skin color, hair color, and description.
     accessory_color (str): The color to apply to the accessory elements.
 
     Returns:
     str: The combined SVG as a string, or None if an error occurs.
     """
-    skin_color, hair_color, description = random.choice(skin_hair_combinations)
+    skin_hair_combo = random.choice(skin_hair_combinations)
+    skin_color, hair_color, description = skin_hair_combo
+
     body_id = random.choice(list(body_svgs.keys()))
     hair_id = random.choice(list(hair_svgs.keys()))
-    return generate_svg(body_svgs[body_id], hair_svgs[hair_id], skin_color, hair_color, description, accessory_color)
+    description += f" {body_id} x {hair_id}"
+    return generate_svg(body_svgs[body_id], hair_svgs[hair_id], description, ColorConfig(skin_color, hair_color, accessory_color))
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Generate SVG headshots.')
-    parser.add_argument('--all', action='store_true',
-                        help='Generate all possible SVG combinations')
-    parser.add_argument('--random', action='store_true',
-                        help='Generate a single random SVG')
-
-    args = parser.parse_args()
-
     setup_directory()
     body_svgs = load_svgs(BODY_SVG_DIR, 'Body')
     hair_svgs = load_svgs(HAIR_SVG_DIR, 'Hair')
-    skin_hair_combinations = load_skin_hair_combinations(
-        SKIN_HAIR_COMBINATIONS_FILE)
 
-    if args.all:
-        save_svgs(body_svgs, hair_svgs, skin_hair_combinations)
-    elif args.random:
-        svg_headshot = generate_random_svg(
-            body_svgs, hair_svgs, skin_hair_combinations, random.choice(HEX_CODES))
-        if svg_headshot:
-            with open('random_headshot.svg', 'w', encoding='utf-8') as file:
-                file.write(svg_headshot)
-            logger.info(
-                "Random SVG headshot generated and saved to 'random_headshot.svg'")
-        else:
-            logger.error("Failed to generate random SVG headshot")
+    with open(SKIN_HAIR_COMBINATIONS_FILE, 'r', encoding="utf-8") as json_file:
+        skin_hair_combinations = json.load(json_file)
+
+    svg_headshot = generate_random_svg(
+        body_svgs, hair_svgs, skin_hair_combinations, random.choice(HEX_CODES))
+    if svg_headshot:
+        with open(OUTPUT_FILE, 'w', encoding='utf-8') as file:
+            file.write(svg_headshot)
+        logger.info(
+            "Random SVG headshot generated and saved to %s", OUTPUT_FILE)
     else:
-        parser.print_help()
+        logger.error("Failed to generate random SVG headshot")
